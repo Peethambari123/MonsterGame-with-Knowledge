@@ -58,7 +58,7 @@ st.title("👾 Monster Quiz Game")
 st.markdown("Defeat the monster by answering questions right. It shrinks when you're correct, and grows if you're wrong!")
 
 # Monster Image
-monster_url = "https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png"
+monster_url = "https://tse2.mm.bing.net/th?id=OIP.0Z_qvxfmya6sNzHZN_XtkgHaHa&pid=Api&P=0&h=180"
 st.image(monster_url, width=st.session_state.monster_size)
 
 # Subject and difficulty selectors
