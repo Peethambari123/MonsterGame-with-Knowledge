@@ -1,86 +1,118 @@
 import streamlit as st
 import google.generativeai as genai
 import random
+import time
 
-# Set up Gemini API
-API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your actual API key
+# Configure Gemini API
+API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your key
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# Initialize session state for question history
-if "question_history" not in st.session_state:
-    st.session_state.question_history = []
+# Page setup
+st.set_page_config(page_title="Monster Quiz Game", page_icon="👾")
 
-# App configuration
-st.set_page_config(page_title="Mega Quiz Generator", page_icon="🧠")
-st.title("🧠 Mega Quiz Generator")
-st.write("Generate unlimited quiz questions from any subject imaginable!")
+# Session state
+if "monster_size" not in st.session_state:
+    st.session_state.monster_size = 300
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "question" not in st.session_state:
+    st.session_state.question = None
+if "options" not in st.session_state:
+    st.session_state.options = []
+if "correct" not in st.session_state:
+    st.session_state.correct = ""
+if "selected_option" not in st.session_state:
+    st.session_state.selected_option = None
+if "answer_submitted" not in st.session_state:
+    st.session_state.answer_submitted = False
 
-# Quiz Generator Interface
-st.subheader("📚 Quiz Question Generator")
+# Monster image
+monster_url = "https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png"
 
-# Sample subjects for dropdown (extendable, but custom input allowed)
-sample_subjects = [
-    "Python", "Quantum Computing", "World History", "Mathematics", "Biology",
-    "Machine Learning", "Literature", "Physics", "Chemistry", "Economics", "Other"
-]
-subject = st.selectbox("Select or Enter a Subject", sample_subjects, index=len(sample_subjects)-1)
-if subject == "Other":
-    subject = st.text_input("Enter any subject (e.g., Astrophysics, Medieval Poetry, Blockchain, etc.)", value="Python")
+# Function to fetch unique questions
+def fetch_question(subject, difficulty):
+    seed_emoji = random.choice(["🐍", "🧠", "📘", "🛡️", "⚙️", "💻", "🧮"])
+    seed = int(time.time())
+    prompt = f"""
+{seed_emoji} Generate a completely new and creative multiple-choice question for the subject '{subject}' at '{difficulty}' level.
+Do NOT repeat previous formats or content.
 
-difficulty = st.selectbox("Select Difficulty", ["Beginner", "Intermediate", "Advanced"])
-
-# Question style for variety
-question_styles = [
-    "conceptual", "scenario-based", "problem-solving", "fact-based", "application-based"
-]
-selected_style = random.choice(question_styles)  # Randomize style for variety
-
-if st.button("🎯 Generate Question"):
-    with st.spinner("Generating a new question..."):
-        # Enhanced prompt for diverse, non-repetitive questions
-        prompt = f"""
-Generate a unique, creative multiple-choice question from the subject: "{subject}" at {difficulty} level.
-The question should be {selected_style}, challenging but understandable, and avoid repetition.
-Avoid repeating these questions: {st.session_state.question_history[-10:]} (last 10 questions for context).
-
-Use this exact format:
-Question: <question>
+Format like this:
+Question: <your question>
 A. <option>
 B. <option>
 C. <option>
 D. <option>
-Answer: <correct letter and full answer>
+Answer: <Correct letter and full option text>
+
+Seed: {seed}
 """
-        try:
-            result = model.generate_content(prompt).text.strip().splitlines()
+    response = model.generate_content(prompt).text.strip().splitlines()
 
-            # Parse the output
-            question, options, answer = "", [], ""
-            for line in result:
-                if line.startswith("Question:"):
-                    question = line.replace("Question:", "").strip()
-                elif line.startswith(("A.", "B.", "C.", "D.")):
-                    options.append(line.strip())
-                elif line.startswith("Answer:"):
-                    answer = line.replace("Answer:", "").strip()
+    question = ""
+    options = []
+    answer = ""
 
-            # Store question in history to avoid repetition
-            st.session_state.question_history.append(question)
+    for line in response:
+        if line.startswith("Question:"):
+            question = line.replace("Question:", "").strip()
+        elif line.startswith(("A.", "B.", "C.", "D.")):
+            options.append(line.strip())
+        elif line.startswith("Answer:"):
+            answer = line.replace("Answer:", "").strip()
 
-            # Display the question
-            st.markdown(f"**🧠 Question (Style: {selected_style}):** {question}")
-            for opt in options:
-                st.markdown(f"- {opt}")
-            
-            # Show answer only when requested
-            if st.button("Show Answer"):
-                st.markdown(f"**✅ Correct Answer:** {answer}")
+    return question, options, answer
 
-        except Exception as e:
-            st.error(f"Error generating question: {str(e)}. Please try again.")
+# App title
+st.title("👾 Monster Quiz Game")
+st.markdown("Defeat the monster by answering questions correctly. It shrinks when you're right, grows when you're wrong!")
 
-# Option to clear question history
-if st.button("Clear Question History"):
-    st.session_state.question_history = []
-    st.success("Question history cleared!")
+# Monster
+st.image(monster_url, width=st.session_state.monster_size)
+
+# Select subject and difficulty
+subject = st.selectbox("📘 Select Subject", ["DBMS", "Python", "AI", "Networks", "OS", "Cybersecurity", "ML"])
+difficulty = st.selectbox("🎯 Select Difficulty", ["beginner", "intermediate", "advanced"])
+
+# Get question
+if st.button("🔄 Get New Question"):
+    q, opts, ans = fetch_question(subject, difficulty)
+    st.session_state.question = q
+    st.session_state.options = opts
+    st.session_state.correct = ans
+    st.session_state.answer_submitted = False
+    st.session_state.selected_option = None
+
+# Show question and options
+if st.session_state.question:
+    st.subheader("🧠 " + st.session_state.question)
+    st.session_state.selected_option = st.radio("Choose your answer:", st.session_state.options)
+
+    if st.button("✅ Submit Answer") and not st.session_state.answer_submitted:
+        st.session_state.answer_submitted = True
+        selected_letter = st.session_state.selected_option[0]
+        correct_letter = st.session_state.correct[0]
+
+        if selected_letter == correct_letter:
+            st.success("✅ Correct! Monster shrinks.")
+            st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
+            st.session_state.score += 1
+        else:
+            st.error(f"❌ Wrong! Correct answer was: {st.session_state.correct}")
+            st.session_state.monster_size = min(500, st.session_state.monster_size + 50)
+
+# Score and progress
+st.markdown(f"**🏆 Score:** {st.session_state.score}")
+progress = max(0, min(100, 100 - (st.session_state.monster_size - 100) * 100 // 400))
+st.progress(progress, text="Monster Weakness Level")
+
+# Reset game
+if st.button("🔁 Reset Game"):
+    st.session_state.monster_size = 300
+    st.session_state.score = 0
+    st.session_state.question = None
+    st.session_state.options = []
+    st.session_state.correct = ""
+    st.session_state.answer_submitted = False
+    st.session_state.selected_option = None
