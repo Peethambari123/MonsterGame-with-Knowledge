@@ -1,100 +1,91 @@
 import streamlit as st
 import google.generativeai as genai
-import random
 
-# === Gemini AI Setup ===
+# Setup Gemini API
 API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-if "chat" not in st.session_state:
-    st.session_state.chat = model.start_chat(history=[])
-
-# === Game Data ===
-questions = {
-    "beginner": [
-        {"question": "What does DBMS stand for?", "options": ["Data Backup Management System", "Database Management System", "Data Based Managing System"], "answer": "Database Management System"},
-        {"question": "Which of these is a primary key?", "options": ["Unique value", "Duplicate", "Null"], "answer": "Unique value"},
-    ],
-    "intermediate": [
-        {"question": "Which SQL clause is used to filter records?", "options": ["WHERE", "SELECT", "ORDER BY"], "answer": "WHERE"},
-        {"question": "What is normalization?", "options": ["Adding redundancy", "Removing redundancy", "Adding columns"], "answer": "Removing redundancy"},
-    ],
-    "advanced": [
-        {"question": "Which normal form removes transitive dependency?", "options": ["1NF", "2NF", "3NF"], "answer": "3NF"},
-        {"question": "Which SQL command is used to remove a table?", "options": ["DELETE", "REMOVE", "DROP"], "answer": "DROP"},
-    ]
-}
-
-# === Session State Setup ===
+# Initialize session states
 if "monster_size" not in st.session_state:
     st.session_state.monster_size = 300
-if "current_q" not in st.session_state:
-    st.session_state.current_q = 0
 if "score" not in st.session_state:
     st.session_state.score = 0
+if "question" not in st.session_state:
+    st.session_state.question = None
+if "answer_options" not in st.session_state:
+    st.session_state.answer_options = []
+if "correct_answer" not in st.session_state:
+    st.session_state.correct_answer = ""
 if "answer_submitted" not in st.session_state:
     st.session_state.answer_submitted = False
 if "selected_option" not in st.session_state:
     st.session_state.selected_option = None
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "subject" not in st.session_state:
+    st.session_state.subject = "DBMS"
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = "beginner"
 
-# === Sidebar Chatbot ===
-with st.sidebar:
-    st.title("🤖 Chatbot")
-    st.write("Ask any study-related question here!")
+# Function to fetch a question from Gemini
+def fetch_question(subject, difficulty):
+    prompt = f"""
+    Generate one multiple-choice question for the subject '{subject}' at {difficulty} level. 
+    Format the response as:
+    Question: <text>
+    Options: [A. ..., B. ..., C. ..., D. ...]
+    Answer: <exact correct option letter and text>
+    """
+    response = model.generate_content(prompt).text
+    lines = response.strip().splitlines()
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    question_text = lines[0].replace("Question: ", "").strip()
+    options_line = [line for line in lines if "Options" in line or line.strip().startswith(("A.", "B.", "C.", "D."))]
+    if options_line[0].startswith("Options:"):
+        options_line = options_line[0].replace("Options:", "").strip()
+        options = [opt.strip() for opt in options_line.split(",")]
+    else:
+        options = [line.strip() for line in options_line]
 
-    if prompt := st.chat_input("Ask Gemini..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+    answer_line = [line for line in lines if "Answer:" in line][0]
+    correct_answer = answer_line.replace("Answer:", "").strip()
 
-        response = st.session_state.chat.send_message(prompt)
-        st.session_state.messages.append({"role": "assistant", "content": response.text})
-        with st.chat_message("assistant"):
-            st.markdown(response.text)
+    return question_text, options, correct_answer
 
-# === Main Game UI ===
-st.title("🎮 Monster Quiz Battle Game")
+# UI
+st.title("🎮 AI-Powered Monster Quiz Game")
+st.markdown("Answer questions correctly to shrink the monster. If you're wrong, it grows!")
 
-subject = st.selectbox("Select Subject", ["DBMS"])
-level = st.selectbox("Choose Difficulty Level", ["beginner", "intermediate", "advanced"])
-quiz = questions[level]
+col1, col2 = st.columns(2)
+with col1:
+    subject = st.selectbox("Select Subject", ["DBMS", "Python", "AI", "Networks"], key="subject")
+with col2:
+    difficulty = st.selectbox("Select Difficulty", ["beginner", "intermediate", "advanced"], key="difficulty")
 
-st.markdown("### 👾 Monster Status")
 st.image("https://cdn-icons-png.flaticon.com/512/1162/1162636.png", width=st.session_state.monster_size)
 
-if st.session_state.current_q < len(quiz):
-    q = quiz[st.session_state.current_q]
-    st.subheader(f"Q{st.session_state.current_q + 1}: {q['question']}")
-    st.session_state.selected_option = st.radio("Choose your answer:", q["options"], key=f"q{st.session_state.current_q}")
+# Get new question if not already fetched or reset
+if st.button("🔄 Get New Question") or st.session_state.question is None:
+    q, opts, ans = fetch_question(subject, difficulty)
+    st.session_state.question = q
+    st.session_state.answer_options = opts
+    st.session_state.correct_answer = ans
+    st.session_state.answer_submitted = False
+    st.session_state.selected_option = None
 
-    if not st.session_state.answer_submitted:
-        if st.button("Submit Answer"):
-            if st.session_state.selected_option == q["answer"]:
-                st.success("✅ Correct! The monster shrinks.")
-                st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
-                st.session_state.score += 1
-            else:
-                st.error("❌ Wrong! The monster grows.")
-                st.session_state.monster_size += 50
+# Show question
+if st.session_state.question:
+    st.subheader("📘 " + st.session_state.question)
+    selected = st.radio("Your answer:", st.session_state.answer_options, key="selected_option")
 
-            st.session_state.answer_submitted = True
-    else:
-        if st.button("Next Question"):
-            st.session_state.current_q += 1
-            st.session_state.answer_submitted = False
-            st.session_state.selected_option = None
-else:
-    st.success(f"🎉 Game Over! You scored {st.session_state.score} out of {len(quiz)}")
-    if st.button("Play Again"):
-        st.session_state.monster_size = 300
-        st.session_state.current_q = 0
-        st.session_state.score = 0
-        st.session_state.answer_submitted = False
-        st.session_state.selected_option = None
+    if st.button("✅ Submit Answer") and not st.session_state.answer_submitted:
+        st.session_state.answer_submitted = True
+        if selected in st.session_state.correct_answer:
+            st.success("Correct! Monster shrinks.")
+            st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
+            st.session_state.score += 1
+        else:
+            st.error(f"Wrong! Correct answer was: {st.session_state.correct_answer}")
+            st.session_state.monster_size += 50
+
+# Score display
+st.markdown(f"**Score:** {st.session_state.score}")
