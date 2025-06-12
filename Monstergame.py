@@ -1,10 +1,16 @@
 import streamlit as st
+import google.generativeai as genai
 import random
 
-# Set page config
-st.set_page_config(page_title="Monster Quiz Battle", layout="centered")
+# === Gemini AI Setup ===
+API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Sample DBMS questions
+if "chat" not in st.session_state:
+    st.session_state.chat = model.start_chat(history=[])
+
+# === Game Data ===
 questions = {
     "beginner": [
         {"question": "What does DBMS stand for?", "options": ["Data Backup Management System", "Database Management System", "Data Based Managing System"], "answer": "Database Management System"},
@@ -20,7 +26,7 @@ questions = {
     ]
 }
 
-# Initialize session state
+# === Session State Setup ===
 if "monster_size" not in st.session_state:
     st.session_state.monster_size = 300
 if "current_q" not in st.session_state:
@@ -31,51 +37,64 @@ if "answer_submitted" not in st.session_state:
     st.session_state.answer_submitted = False
 if "selected_option" not in st.session_state:
     st.session_state.selected_option = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-def reset_game():
-    st.session_state.monster_size = 300
-    st.session_state.current_q = 0
-    st.session_state.score = 0
-    st.session_state.answer_submitted = False
-    st.session_state.selected_option = None
+# === Sidebar Chatbot ===
+with st.sidebar:
+    st.title("🤖 Chatbot")
+    st.write("Ask any study-related question here!")
 
-def main():
-    st.title("🧟 Monster Quiz Battle Game")
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    subject = st.selectbox("Select Subject", ["DBMS"])
-    level = st.selectbox("Choose Difficulty Level", ["beginner", "intermediate", "advanced"])
+    if prompt := st.chat_input("Ask Gemini..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-    quiz = questions[level]
+        response = st.session_state.chat.send_message(prompt)
+        st.session_state.messages.append({"role": "assistant", "content": response.text})
+        with st.chat_message("assistant"):
+            st.markdown(response.text)
 
-    st.markdown("### 👾 Monster Status")
-    st.image("https://cdn-icons-png.flaticon.com/512/1162/1162636.png", width=st.session_state.monster_size)
+# === Main Game UI ===
+st.title("🎮 Monster Quiz Battle Game")
 
-    if st.session_state.current_q < len(quiz):
-        q = quiz[st.session_state.current_q]
-        st.subheader(f"Q{st.session_state.current_q + 1}: {q['question']}")
-        st.session_state.selected_option = st.radio("Choose your answer:", q["options"], key=f"q{st.session_state.current_q}")
+subject = st.selectbox("Select Subject", ["DBMS"])
+level = st.selectbox("Choose Difficulty Level", ["beginner", "intermediate", "advanced"])
+quiz = questions[level]
 
-        if not st.session_state.answer_submitted:
-            if st.button("Submit Answer"):
-                if st.session_state.selected_option == q["answer"]:
-                    st.success("✅ Correct! The monster shrinks.")
-                    st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
-                    st.session_state.score += 1
-                else:
-                    st.error("❌ Wrong! The monster grows.")
-                    st.session_state.monster_size += 50
+st.markdown("### 👾 Monster Status")
+st.image("https://cdn-icons-png.flaticon.com/512/1162/1162636.png", width=st.session_state.monster_size)
 
-                st.session_state.answer_submitted = True
-        else:
-            if st.button("Next Question"):
-                st.session_state.current_q += 1
-                st.session_state.answer_submitted = False
-                st.session_state.selected_option = None
+if st.session_state.current_q < len(quiz):
+    q = quiz[st.session_state.current_q]
+    st.subheader(f"Q{st.session_state.current_q + 1}: {q['question']}")
+    st.session_state.selected_option = st.radio("Choose your answer:", q["options"], key=f"q{st.session_state.current_q}")
 
+    if not st.session_state.answer_submitted:
+        if st.button("Submit Answer"):
+            if st.session_state.selected_option == q["answer"]:
+                st.success("✅ Correct! The monster shrinks.")
+                st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
+                st.session_state.score += 1
+            else:
+                st.error("❌ Wrong! The monster grows.")
+                st.session_state.monster_size += 50
+
+            st.session_state.answer_submitted = True
     else:
-        st.balloons()
-        st.success(f"🎉 Game Over! You scored {st.session_state.score} out of {len(quiz)}")
-        if st.button("Play Again"):
-            reset_game()
-
-main()
+        if st.button("Next Question"):
+            st.session_state.current_q += 1
+            st.session_state.answer_submitted = False
+            st.session_state.selected_option = None
+else:
+    st.success(f"🎉 Game Over! You scored {st.session_state.score} out of {len(quiz)}")
+    if st.button("Play Again"):
+        st.session_state.monster_size = 300
+        st.session_state.current_q = 0
+        st.session_state.score = 0
+        st.session_state.answer_submitted = False
+        st.session_state.selected_option = None
