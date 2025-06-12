@@ -4,7 +4,7 @@ import random
 import time
 
 # Configure Gemini API
-API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your key
+API_KEY = "YOUR_API_KEY_HERE"  # Replace with your actual API key
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -27,8 +27,26 @@ if "selected_option" not in st.session_state:
 if "answer_submitted" not in st.session_state:
     st.session_state.answer_submitted = False
 
-# Monster image
-monster_url = "https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png"
+# Monster images based on size
+def get_monster_image(size):
+    if size <= 150:
+        return "https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png"  # Weak monster
+    elif size <= 300:
+        return "https://cdn.pixabay.com/photo/2016/03/31/19/58/monster-1295124_960_720.png"  # Medium monster
+    else:
+        return "https://cdn.pixabay.com/photo/2016/03/31/19/58/monster-1295125_960_720.png"  # Strong monster
+
+# CSS for size transition animation
+st.markdown("""
+    <style>
+        .monster-image {
+            transition: transform 0.5s ease-in-out;
+        }
+        .monster-image:hover {
+            transform: scale(1.05);
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Function to fetch unique questions
 def fetch_question(subject, difficulty):
@@ -68,8 +86,17 @@ Seed: {seed}
 st.title("👾 Monster Quiz Game")
 st.markdown("Defeat the monster by answering questions correctly. It shrinks when you're right, grows when you're wrong!")
 
-# Monster
-st.image(monster_url, width=st.session_state.monster_size)
+# Monster display with animation
+monster_url = get_monster_image(st.session_state.monster_size)
+st.markdown(f'<img src="{monster_url}" class="monster-image" width="{st.session_state.monster_size}">', unsafe_allow_html=True)
+
+# Monster status message
+if st.session_state.monster_size <= 150:
+    st.markdown("**The monster is nearly defeated!**")
+elif st.session_state.monster_size >= 400:
+    st.markdown("**The monster is growing stronger!**")
+else:
+    st.markdown("**Keep fighting the monster!**")
 
 # Select subject and difficulty
 subject = st.selectbox("📘 Select Subject", ["DBMS", "Python", "AI", "Networks", "OS", "Cybersecurity", "ML"])
