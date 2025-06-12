@@ -1,92 +1,107 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Set up the Gemini API
-API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Use your key here
+# Setup Gemini API
+API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your own API key
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# Streamlit page setup
+# Page config
 st.set_page_config(page_title="Monster Quiz Game", page_icon="👾")
 
-# Initialize session states
+# Initial state
 if "monster_size" not in st.session_state:
-    st.session_state.monster_size = 300  # size between 100 and 500
+    st.session_state.monster_size = 300
 if "score" not in st.session_state:
     st.session_state.score = 0
-if "question_data" not in st.session_state:
-    st.session_state.question_data = None
-if "answer_submitted" not in st.session_state:
-    st.session_state.answer_submitted = False
+if "question" not in st.session_state:
+    st.session_state.question = None
+if "options" not in st.session_state:
+    st.session_state.options = []
+if "correct" not in st.session_state:
+    st.session_state.correct = ""
 if "selected_option" not in st.session_state:
     st.session_state.selected_option = None
+if "answer_submitted" not in st.session_state:
+    st.session_state.answer_submitted = False
 
-# Function to fetch question from Gemini
+# Function to fetch a question
 def fetch_question(subject, difficulty):
     prompt = f"""
-    Generate one multiple-choice question for the subject '{subject}' at '{difficulty}' level.
-    Format:
-    Question: <question>
-    A. <option1>
-    B. <option2>
-    C. <option3>
-    D. <option4>
-    Answer: <Correct Option Letter and Text>
+    Generate ONE multiple choice question for the subject '{subject}' at '{difficulty}' level.
+    Format exactly like this:
+    Question: <your question>
+    A. <option>
+    B. <option>
+    C. <option>
+    D. <option>
+    Answer: <correct letter and option text>
     """
-    response = model.generate_content(prompt).text
-    lines = response.strip().splitlines()
+    response = model.generate_content(prompt).text.strip().splitlines()
 
-    question = [line for line in lines if line.startswith("Question:")][0].replace("Question:", "").strip()
-    options = [line.strip() for line in lines if line.strip().startswith(("A.", "B.", "C.", "D."))]
-    answer = [line for line in lines if "Answer:" in line][0].replace("Answer:", "").strip()
+    question = ""
+    options = []
+    answer = ""
+
+    for line in response:
+        if line.startswith("Question:"):
+            question = line.replace("Question:", "").strip()
+        elif line.startswith(("A.", "B.", "C.", "D.")):
+            options.append(line.strip())
+        elif line.startswith("Answer:"):
+            answer = line.replace("Answer:", "").strip()
+
     return question, options, answer
 
-# Title
+# Header
 st.title("👾 Monster Quiz Game")
-st.markdown("Answer correctly to **shrink** the monster. Wrong answers make it **grow**!")
+st.markdown("Defeat the monster by answering questions right. It shrinks when you're correct, and grows if you're wrong!")
 
-# Select subject and difficulty
-subject = st.selectbox("📘 Select Subject", ["DBMS", "Python", "AI", "Networks", "OS", "ML", "Cybersecurity"])
+# Monster Image
+monster_url = "https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png"
+st.image(monster_url, width=st.session_state.monster_size)
+
+# Subject and difficulty selectors
+subject = st.selectbox("📘 Select Subject", ["DBMS", "Python", "AI", "Networks", "OS", "Cybersecurity"])
 difficulty = st.selectbox("🎯 Select Difficulty", ["beginner", "intermediate", "advanced"])
-
-# Monster image
-st.image("https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png", width=st.session_state.monster_size)
 
 # Get new question
 if st.button("🔄 Get New Question"):
-    q, opts, ans = fetch_question(subject, difficulty)
-    st.session_state.question_data = {"question": q, "options": opts, "correct": ans}
+    st.session_state.question, st.session_state.options, st.session_state.correct = fetch_question(subject, difficulty)
     st.session_state.answer_submitted = False
     st.session_state.selected_option = None
 
-# Display question and options
-if st.session_state.question_data:
-    st.subheader("🧠 " + st.session_state.question_data["question"])
-    selected = st.radio("Choose your answer:", st.session_state.question_data["options"], key="selected_option")
+# Show question and options
+if st.session_state.question:
+    st.subheader("🧠 " + st.session_state.question)
+    st.session_state.selected_option = st.radio("Choose your answer:", st.session_state.options)
 
-    # Submit answer
     if st.button("✅ Submit Answer") and not st.session_state.answer_submitted:
         st.session_state.answer_submitted = True
-        correct_letter = st.session_state.question_data["correct"].strip()[0]
-        selected_letter = selected.strip()[0]
+        selected_letter = st.session_state.selected_option[0]
+        correct_letter = st.session_state.correct[0]
 
         if selected_letter == correct_letter:
-            st.success("✅ Correct! Monster shrinks.")
+            st.success("✅ Correct! The monster shrinks.")
             st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
             st.session_state.score += 1
         else:
-            st.error(f"❌ Wrong! Correct answer was: {st.session_state.question_data['correct']}")
+            st.error(f"❌ Wrong! Correct answer was: {st.session_state.correct}")
             st.session_state.monster_size = min(500, st.session_state.monster_size + 50)
 
-# Show score and monster weakness as progress bar (0–100)
-monster_percent = max(0, min(100, 100 - (st.session_state.monster_size - 100) * 100 // 400))
+# Score
 st.markdown(f"**🏆 Score:** {st.session_state.score}")
-st.progress(monster_percent, text="Monster Weakness Level")
 
-# Reset Game
+# Progress bar
+progress = max(0, min(100, 100 - (st.session_state.monster_size - 100) * 100 // 400))
+st.progress(progress, text="Monster Weakness Level")
+
+# Reset game
 if st.button("🔁 Reset Game"):
     st.session_state.monster_size = 300
     st.session_state.score = 0
-    st.session_state.question_data = None
+    st.session_state.question = None
+    st.session_state.options = []
+    st.session_state.correct = ""
     st.session_state.answer_submitted = False
     st.session_state.selected_option = None
