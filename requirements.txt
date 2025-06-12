@@ -1,2 +1,2 @@
 streamlit
-pandas       # if using dataframes
+google-generativeai
