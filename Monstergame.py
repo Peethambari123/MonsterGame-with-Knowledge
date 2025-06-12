@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # Setup Gemini API
-API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"
+API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your own key if needed
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -38,14 +38,13 @@ def fetch_question(subject, difficulty):
     response = model.generate_content(prompt).text
     lines = response.strip().splitlines()
 
-    question_text = lines[0].replace("Question: ", "").strip()
-    options_line = [line for line in lines if "Options" in line or line.strip().startswith(("A.", "B.", "C.", "D."))]
-    if options_line[0].startswith("Options:"):
-        options_line = options_line[0].replace("Options:", "").strip()
-        options = [opt.strip() for opt in options_line.split(",")]
-    else:
-        options = [line.strip() for line in options_line]
+    # Extract question
+    question_text = [line for line in lines if line.startswith("Question:")][0].replace("Question:", "").strip()
 
+    # Extract options
+    options = [line.strip() for line in lines if line.strip().startswith(("A.", "B.", "C.", "D."))]
+
+    # Extract answer
     answer_line = [line for line in lines if "Answer:" in line][0]
     correct_answer = answer_line.replace("Answer:", "").strip()
 
@@ -55,15 +54,18 @@ def fetch_question(subject, difficulty):
 st.title("🎮 AI-Powered Monster Quiz Game")
 st.markdown("Answer questions correctly to shrink the monster. If you're wrong, it grows!")
 
+# Subject and difficulty selection
 col1, col2 = st.columns(2)
+subject_list = ["DBMS", "Python", "AI", "Networks", "OS", "ML", "Cybersecurity", "Data Science"]
 with col1:
-    subject = st.selectbox("Select Subject", ["DBMS", "Python", "AI", "Networks"], key="subject")
+    subject = st.selectbox("Select Subject", subject_list, key="subject")
 with col2:
     difficulty = st.selectbox("Select Difficulty", ["beginner", "intermediate", "advanced"], key="difficulty")
 
+# Monster Image
 st.image("https://cdn-icons-png.flaticon.com/512/1162/1162636.png", width=st.session_state.monster_size)
 
-# Get new question if not already fetched or reset
+# Fetch new question
 if st.button("🔄 Get New Question") or st.session_state.question is None:
     q, opts, ans = fetch_question(subject, difficulty)
     st.session_state.question = q
@@ -72,14 +74,16 @@ if st.button("🔄 Get New Question") or st.session_state.question is None:
     st.session_state.answer_submitted = False
     st.session_state.selected_option = None
 
-# Show question
+# Show question and options
 if st.session_state.question:
     st.subheader("📘 " + st.session_state.question)
     selected = st.radio("Your answer:", st.session_state.answer_options, key="selected_option")
 
     if st.button("✅ Submit Answer") and not st.session_state.answer_submitted:
         st.session_state.answer_submitted = True
-        if selected in st.session_state.correct_answer:
+        correct_letter = st.session_state.correct_answer.strip()[0]
+        selected_letter = selected.strip()[0]
+        if selected_letter == correct_letter:
             st.success("Correct! Monster shrinks.")
             st.session_state.monster_size = max(100, st.session_state.monster_size - 50)
             st.session_state.score += 1
@@ -87,5 +91,13 @@ if st.session_state.question:
             st.error(f"Wrong! Correct answer was: {st.session_state.correct_answer}")
             st.session_state.monster_size += 50
 
-# Score display
+# Display score and monster status
 st.markdown(f"**Score:** {st.session_state.score}")
+health = max(0, 1000 - st.session_state.monster_size * 2)
+st.progress(health, text=f"Monster Weakness Level: {health}/1000")
+
+# Reset Game Button
+if st.button("🔁 Reset Game"):
+    st.session_state.monster_size = 300
+    st.session_state.score = 0
+    st.session_state.question = None
