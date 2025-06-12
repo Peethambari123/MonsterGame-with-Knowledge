@@ -4,14 +4,17 @@ import random
 import time
 
 # Configure Gemini API
-API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your key
+API_KEY = "AIzaSyAPlD-AdySRdcbtYZYmDV4v_spoAfYVm4A"  # Replace with your actual key
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # Page setup
 st.set_page_config(page_title="Monster Quiz Game", page_icon="👾")
 
-# Session state
+# Monster image from user
+monster_url = "https://tse2.mm.bing.net/th?id=OIP.0Z_qvxfmya6sNzHZN_XtkgHaHa&pid=Api&P=0&h=180"
+
+# Session states
 if "monster_size" not in st.session_state:
     st.session_state.monster_size = 300
 if "score" not in st.session_state:
@@ -27,25 +30,19 @@ if "selected_option" not in st.session_state:
 if "answer_submitted" not in st.session_state:
     st.session_state.answer_submitted = False
 
-# Monster image
-monster_url = "https://cdn.pixabay.com/photo/2013/07/13/13/37/monster-161004_960_720.png"
-
-# Function to fetch unique questions
+# Function to fetch a unique question
 def fetch_question(subject, difficulty):
     seed_emoji = random.choice(["🐍", "🧠", "📘", "🛡️", "⚙️", "💻", "🧮"])
     seed = int(time.time())
     prompt = f"""
 {seed_emoji} Generate a completely new and creative multiple-choice question for the subject '{subject}' at '{difficulty}' level.
-Do NOT repeat previous formats or content.
-
-Format like this:
+Format:
 Question: <your question>
 A. <option>
 B. <option>
 C. <option>
 D. <option>
 Answer: <Correct letter and full option text>
-
 Seed: {seed}
 """
     response = model.generate_content(prompt).text.strip().splitlines()
@@ -64,18 +61,18 @@ Seed: {seed}
 
     return question, options, answer
 
-# App title
+# App UI
 st.title("👾 Monster Quiz Game")
 st.markdown("Defeat the monster by answering questions correctly. It shrinks when you're right, grows when you're wrong!")
 
-# Monster
+# Display monster
 st.image(monster_url, width=st.session_state.monster_size)
 
-# Select subject and difficulty
+# Subject and difficulty selection
 subject = st.selectbox("📘 Select Subject", ["DBMS", "Python", "AI", "Networks", "OS", "Cybersecurity", "ML"])
 difficulty = st.selectbox("🎯 Select Difficulty", ["beginner", "intermediate", "advanced"])
 
-# Get question
+# Get new question
 if st.button("🔄 Get New Question"):
     q, opts, ans = fetch_question(subject, difficulty)
     st.session_state.question = q
@@ -84,7 +81,7 @@ if st.button("🔄 Get New Question"):
     st.session_state.answer_submitted = False
     st.session_state.selected_option = None
 
-# Show question and options
+# Show question and answer options
 if st.session_state.question:
     st.subheader("🧠 " + st.session_state.question)
     st.session_state.selected_option = st.radio("Choose your answer:", st.session_state.options)
@@ -102,12 +99,12 @@ if st.session_state.question:
             st.error(f"❌ Wrong! Correct answer was: {st.session_state.correct}")
             st.session_state.monster_size = min(500, st.session_state.monster_size + 50)
 
-# Score and progress
+# Show score and monster weakness level
 st.markdown(f"**🏆 Score:** {st.session_state.score}")
 progress = max(0, min(100, 100 - (st.session_state.monster_size - 100) * 100 // 400))
 st.progress(progress, text="Monster Weakness Level")
 
-# Reset game
+# Reset game button
 if st.button("🔁 Reset Game"):
     st.session_state.monster_size = 300
     st.session_state.score = 0
